@@ -78,11 +78,5 @@ export const toolbox = {
       colour: '#A65D7B',
       custom: 'VARIABLE',
     },
-    {
-      kind: 'category',
-      name: '函数',
-      colour: '#8B6D52',
-      custom: 'PROCEDURE',
-    },
   ],
 }

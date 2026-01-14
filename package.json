@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@blockly/theme-modern": "^7.0.4",
     "blockly": "^12.3.1",
+    "skulpt": "^1.2.0",
     "vue": "^3.5.26"
   },
   "devDependencies": {

@@ -2,15 +2,20 @@
 import { onBeforeUnmount, onMounted, ref } from "vue"
 import * as Blockly from "blockly/core"
 import "blockly/blocks"
-import Theme from "@blockly/theme-modern"
 import { setBlocklyLocale } from "./blockly/locale"
 import { defineBlocks } from "./blockly/blocks"
 import { toolbox } from "./blockly/toolbox"
 import { initPythonGenerator } from "./blockly/pythonGenerator"
+import { runPython } from "./blockly/skulptRunner"
 
 const workspaceHost = ref<HTMLDivElement | null>(null)
 const codePreview = ref("")
 const statusText = ref("准备就绪")
+const idleStatus = statusText.value
+const runOutput = ref("")
+const storageKey = "blockly-workspace"
+let saveTimer: number | null = null
+let suppressSave = false
 
 let workspace: Blockly.WorkspaceSvg | null = null
 const generator = initPythonGenerator()
@@ -21,53 +26,79 @@ const updateCode = () => {
   codePreview.value = code.trim() || "# 在左侧拖入方块生成Python代码"
 }
 
-// const platformTheme = Blockly.Theme.defineTheme('cnPlatform', {
-//   base: Blockly.Themes.Zelos,
-//   componentStyles: {
-//     workspaceBackgroundColour: '#f7f5ef',
-//     toolboxBackgroundColour: '#f2ebe2',
-//     toolboxForegroundColour: '#28343b',
-//     flyoutBackgroundColour: '#fffaf2',
-//     flyoutOpacity: 0.96,
-//     scrollbarColour: '#c3b7aa',
-//     scrollbarOpacity: 0.7,
-//   },
-//   fontStyle: {
-//     family: '"Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif',
-//     size: 13,
-//     weight: 500,
-//   },
-//   blockStyles: {
-//     logic_blocks: { colourPrimary: '#4f7a8f', colourSecondary: '#406574', colourTertiary: '#2f4b57' },
-//     loop_blocks: { colourPrimary: '#4f8f6d', colourSecondary: '#3f7458', colourTertiary: '#2e5944' },
-//     math_blocks: { colourPrimary: '#c6844a', colourSecondary: '#a96f3c', colourTertiary: '#8a592f' },
-//     text_blocks: { colourPrimary: '#b86a80', colourSecondary: '#9c5668', colourTertiary: '#7d4552' },
-//     list_blocks: { colourPrimary: '#6d6fb8', colourSecondary: '#595a99', colourTertiary: '#444575' },
-//     variable_blocks: { colourPrimary: '#aa5d7b', colourSecondary: '#8c4c64', colourTertiary: '#6f3b4e' },
-//     procedure_blocks: { colourPrimary: '#8b6d52', colourSecondary: '#705640', colourTertiary: '#54402f' },
-//   },
-//   categoryStyles: {
-//     logic_category: { colour: '#4f7a8f' },
-//     loop_category: { colour: '#4f8f6d' },
-//     math_category: { colour: '#c6844a' },
-//     text_category: { colour: '#b86a80' },
-//     list_category: { colour: '#6d6fb8' },
-//     variable_category: { colour: '#aa5d7b' },
-//     procedure_category: { colour: '#8b6d52' },
-//   },
-// })
-
 const handleResize = () => {
   if (workspace) {
     Blockly.svgResize(workspace)
   }
 }
 
+const saveWorkspace = () => {
+  if (!workspace || suppressSave) return
+  if (saveTimer) {
+    window.clearTimeout(saveTimer)
+  }
+  saveTimer = window.setTimeout(() => {
+    const state = Blockly.serialization.workspaces.save(workspace!)
+    localStorage.setItem(storageKey, JSON.stringify(state))
+  }, 250)
+}
+
+const restoreWorkspace = () => {
+  if (!workspace) return
+  const raw = localStorage.getItem(storageKey)
+  if (!raw) return
+  try {
+    const state = JSON.parse(raw)
+    suppressSave = true
+    Blockly.serialization.workspaces.load(state, workspace)
+  } catch {
+    localStorage.removeItem(storageKey)
+  } finally {
+    suppressSave = false
+  }
+}
+
+const handleClearWorkspace = () => {
+  if (!workspace) return
+  suppressSave = true
+  workspace.clear()
+  suppressSave = false
+  localStorage.removeItem(storageKey)
+  updateCode()
+}
+
 const handleRun = () => {
-  statusText.value = "执行环境尚未接入，可先复制代码到Python环境运行"
-  window.setTimeout(() => {
-    statusText.value = "准备就绪"
-  }, 2200)
+  if (!codePreview.value.trim()) {
+    statusText.value = "No code to run."
+    window.setTimeout(() => {
+      statusText.value = idleStatus
+    }, 1600)
+    return
+  }
+
+  runOutput.value = ""
+  statusText.value = "Running..."
+
+  runPython(codePreview.value, (text) => {
+    runOutput.value += text
+  })
+    .then(() => {
+      if (!runOutput.value) {
+        runOutput.value = ""
+      }
+      statusText.value = "运行成功"
+    })
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error)
+      runOutput.value =
+        (runOutput.value ? `${runOutput.value}\n` : "") + `Error: ${message}`
+      statusText.value = "运行失败"
+    })
+    .finally(() => {
+      window.setTimeout(() => {
+        statusText.value = idleStatus
+      }, 2000)
+    })
 }
 
 const handleCopy = async () => {
@@ -88,10 +119,10 @@ const handleDownload = () => {
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.href = url
-  link.download = "blockly_program.py"
+  link.download = "demo.py"
   link.click()
   URL.revokeObjectURL(url)
-  statusText.value = "已导出为 .py 文件"
+  statusText.value = "已导出代码文件"
   window.setTimeout(() => {
     statusText.value = "准备就绪"
   }, 1800)
@@ -112,12 +143,13 @@ onMounted(() => {
       minScale: 0.5,
     },
     trashcan: true,
-    renderer: "geras",
-    theme: Theme,
-    media: "/blockly-media/",
+    renderer: "zelos",
+    theme: Blockly.Themes.Zelos,
   })
   workspace.addChangeListener(updateCode)
+  workspace.addChangeListener(saveWorkspace)
   updateCode()
+  restoreWorkspace()
   window.addEventListener("resize", handleResize)
 })
 
@@ -127,6 +159,9 @@ onBeforeUnmount(() => {
     workspace.dispose()
     workspace = null
   }
+  if (saveTimer) {
+    window.clearTimeout(saveTimer)
+  }
 })
 </script>
 
@@ -134,18 +169,15 @@ onBeforeUnmount(() => {
   <div class="app-shell">
     <header class="app-header">
       <div class="brand">
-        <span class="brand-badge">Blockly</span>
+        <span class="brand-badge">草履虫</span>
         <div>
-          <h1>中文Python可视化编程平台</h1>
-          <p>拖拽方块，实时生成可执行的Python代码</p>
+          <h1>拖拽式代码生成网页</h1>
+          <p>拖拽方块，实时生成可执行的 Python 代码</p>
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn ghost" type="button" @click="handleCopy">
-          复制代码
-        </button>
-        <button class="btn ghost" type="button" @click="handleDownload">
-          导出 .py
+        <button class="btn ghost" type="button" @click="handleClearWorkspace">
+          清除
         </button>
         <button class="btn primary" type="button" @click="handleRun">
           运行
@@ -160,9 +192,6 @@ onBeforeUnmount(() => {
             <h2>工作区</h2>
             <p>通过分类工具箱选择方块，构建你的程序</p>
           </div>
-          <div class="panel-tip">
-            <span>实时反馈</span>
-          </div>
         </div>
         <div class="workspace-stage" ref="workspaceHost"></div>
       </section>
@@ -170,10 +199,9 @@ onBeforeUnmount(() => {
       <aside class="side-panel">
         <div class="panel-head">
           <div>
-            <h2>Python代码</h2>
-            <p>符合PEP8风格，支持直接导出</p>
+            <h2>Python 代码</h2>
+            <p>由左侧的积木块自动生成</p>
           </div>
-          <div class="panel-tip">预览</div>
         </div>
         <pre class="code-preview"><code>{{ codePreview }}</code></pre>
         <div class="status-bar">
@@ -187,6 +215,8 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
+        <div class="output-label">运行结果</div>
+        <pre class="code-preview output-preview"><code>{{ runOutput }}</code></pre>
       </aside>
     </main>
 
