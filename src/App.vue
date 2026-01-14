@@ -145,6 +145,7 @@ onMounted(() => {
     trashcan: true,
     renderer: "zelos",
     theme: Blockly.Themes.Zelos,
+    media: "/blockly-media/",
   })
   workspace.addChangeListener(updateCode)
   workspace.addChangeListener(saveWorkspace)
