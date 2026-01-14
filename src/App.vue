@@ -170,7 +170,7 @@ onBeforeUnmount(() => {
   <div class="app-shell">
     <header class="app-header">
       <div class="brand">
-        <span class="brand-badge">草履虫</span>
+        <span class="brand-badge">小方块</span>
         <div>
           <h1>拖拽式代码生成网页</h1>
           <p>拖拽方块，实时生成可执行的 Python 代码</p>
