@@ -117,7 +117,7 @@ body {
 
 .workspace-stage {
   flex: 1;
-  min-height: 520px;
+  min-height: 640px;
 }
 
 .code-preview {
@@ -236,7 +236,7 @@ body {
   }
 
   .workspace-stage {
-    min-height: 420px;
+    min-height: 520px;
   }
 
   .app-footer {
