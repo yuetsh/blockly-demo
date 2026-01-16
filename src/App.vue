@@ -7,6 +7,11 @@ import { defineBlocks } from "./blockly/blocks"
 import { toolbox } from "./blockly/toolbox"
 import { initPythonGenerator } from "./blockly/pythonGenerator"
 import { runPython } from "./blockly/skulptRunner"
+import {
+  decodeWorkspaceState,
+  encodeWorkspaceState,
+  getShareStateFromUrl,
+} from "./blockly/share"
 
 const workspaceHost = ref<HTMLDivElement | null>(null)
 const codePreview = ref("")
@@ -41,6 +46,28 @@ const saveWorkspace = () => {
     const state = Blockly.serialization.workspaces.save(workspace!)
     localStorage.setItem(storageKey, JSON.stringify(state))
   }, 250)
+}
+
+const getStateFromUrl = () => {
+  return getShareStateFromUrl(window.location)
+}
+
+const loadWorkspaceFromUrl = () => {
+  if (!workspace) return false
+  const raw = getStateFromUrl()
+  if (!raw) return false
+  try {
+    const state = decodeWorkspaceState(raw)
+    suppressSave = true
+    workspace.clear()
+    Blockly.serialization.workspaces.load(state, workspace)
+    updateCode()
+    return true
+  } catch {
+    return false
+  } finally {
+    suppressSave = false
+  }
 }
 
 const restoreWorkspace = () => {
@@ -101,6 +128,23 @@ const handleRun = () => {
     })
 }
 
+const handleShare = async () => {
+  if (!workspace) return
+  try {
+    const state = Blockly.serialization.workspaces.save(workspace)
+    const encoded = encodeWorkspaceState(state)
+    const url = `${window.location.origin}${window.location.pathname}#state=${encoded}`
+    await navigator.clipboard.writeText(url)
+    statusText.value = "分享链接已复制"
+  } catch {
+    statusText.value = "分享失败，请稍后重试"
+  } finally {
+    window.setTimeout(() => {
+      statusText.value = idleStatus
+    }, 1800)
+  }
+}
+
 const handleCopy = async () => {
   try {
     await navigator.clipboard.writeText(codePreview.value)
@@ -150,7 +194,9 @@ onMounted(() => {
   workspace.addChangeListener(updateCode)
   workspace.addChangeListener(saveWorkspace)
   updateCode()
-  restoreWorkspace()
+  if (!loadWorkspaceFromUrl()) {
+    restoreWorkspace()
+  }
   window.addEventListener("resize", handleResize)
 })
 
@@ -177,6 +223,9 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="header-actions">
+        <button class="btn ghost" type="button" @click="handleShare">
+          分享
+        </button>
         <button class="btn ghost" type="button" @click="handleClearWorkspace">
           清除
         </button>
