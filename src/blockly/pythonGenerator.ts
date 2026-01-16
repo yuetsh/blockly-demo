@@ -13,7 +13,17 @@ export const initPythonGenerator = () => {
     return [code, Order.FUNCTION_CALL]
   }
 
-  pythonGenerator.addReservedWords('input,print')
+  pythonGenerator.forBlock['cn_int'] = (block: Block, generator) => {
+    const value = generator.valueToCode(block, 'VALUE', Order.NONE) || '0'
+    return [`int(${value})`, Order.FUNCTION_CALL]
+  }
+
+  pythonGenerator.forBlock['cn_float'] = (block: Block, generator) => {
+    const value = generator.valueToCode(block, 'VALUE', Order.NONE) || '0'
+    return [`float(${value})`, Order.FUNCTION_CALL]
+  }
+
+  pythonGenerator.addReservedWords('input,print,int,float')
 
   return pythonGenerator
 }

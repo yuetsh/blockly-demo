@@ -21,4 +21,27 @@ export const defineBlocks = () => {
       this.setHelpUrl('')
     },
   }
+  Blockly.Blocks['cn_int'] = {
+    init() {
+      this.appendValueInput('VALUE').setCheck(null).appendField('将')
+      this.appendDummyInput().appendField('转成整数')
+      this.setInputsInline(true)
+      this.setOutput(true, 'Number')
+      this.setColour('#C07B4E')
+      this.setTooltip('转成整数')
+      this.setHelpUrl('')
+    },
+  }
+
+  Blockly.Blocks['cn_float'] = {
+    init() {
+      this.appendValueInput('VALUE').setCheck(null).appendField('将')
+      this.appendDummyInput().appendField('转成小数')
+      this.setInputsInline(true)
+      this.setOutput(true, 'Number')
+      this.setColour('#C07B4E')
+      this.setTooltip('转成小数')
+      this.setHelpUrl('')
+    },
+  }
 }

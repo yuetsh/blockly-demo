@@ -47,6 +47,8 @@ export const toolbox = {
         { kind: 'block', type: 'math_single' },
         { kind: 'block', type: 'math_random_int' },
         { kind: 'block', type: 'math_round' },
+        { kind: 'block', type: 'cn_int' },
+        { kind: 'block', type: 'cn_float' },
       ],
     },
     {
